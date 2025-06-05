@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>3D RPM Gauge</title>
+  <style>
+    body { margin: 0; background: #f0f0f0; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<script src="https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.min.js"></script>
+<script>
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
+  const renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+
+  // Dial base (cylinder)
+  const dialGeometry = new THREE.CylinderGeometry(5, 5, 1, 64);
+  const dialMaterial = new THREE.MeshPhongMaterial({color: 0x1e2a47});
+  const dial = new THREE.Mesh(dialGeometry, dialMaterial);
+  dial.rotation.x = Math.PI / 2;
+  scene.add(dial);
+
+  // Tick marks - small boxes arranged around dial
+  const tickGroup = new THREE.Group();
+  for(let i=0; i<=10; i++){
+    const tickLength = (i % 5 === 0) ? 0.7 : 0.4;
+    const tickGeom = new THREE.BoxGeometry(0.1, tickLength, 0.2);
+    const tickMat = new THREE.MeshBasicMaterial({color: 0xffffff});
+    const tick = new THREE.Mesh(tickGeom, tickMat);
+    const angle = (Math.PI * 1.5 / 10) * i - Math.PI * 3/4; // from -135 deg to 135 deg
+    tick.position.x = Math.cos(angle) * 4.7;
+    tick.position.z = Math.sin(angle) * 4.7;
+    tick.rotation.y = -angle;
+    tickGroup.add(tick);
+  }
+  dial.add(tickGroup);
+
+  // Numeric RPM labels
+  const loader = new THREE.FontLoader();
+  loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function(font){
+    for(let i=0; i<=10; i++){
+      const rpmValue = i * 700; // 0 to 7000 RPM in steps of 700
+      const textGeo = new THREE.TextGeometry(rpmValue.toString(), {
+        font: font,
+        size: 0.6,
+        height: 0.05,
+      });
+      const textMat = new THREE.MeshBasicMaterial({color: 0xffffff});
+      const textMesh = new THREE.Mesh(textGeo, textMat);
+      const angle = (Math.PI * 1.5 / 10) * i - Math.PI * 3/4;
+      textMesh.position.x = Math.cos(angle) * 3.8;
+      textMesh.position.z = Math.sin(angle) * 3.8;
+      textMesh.rotation.y = -angle;
+      textMesh.rotation.x = Math.PI / 2;
+      dial.add(textMesh);
+    }
+  });
+
+  // Safe zone arc (green)
+  const safeZoneGeom = new THREE.RingGeometry(3.9, 4.2, 32, 1, -Math.PI * 3/4, Math.PI * 1.0);
+  const safeZoneMat = new THREE.MeshBasicMaterial({color: 0x2ecc40, side: THREE.DoubleSide});
+  const safeZone = new THREE.Mesh(safeZoneGeom, safeZoneMat);
+  safeZone.rotation.x = Math.PI / 2;
+  dial.add(safeZone);
+
+  // Danger zone arc (red)
+  const dangerZoneGeom = new THREE.RingGeometry(3.9, 4.2, 32, 1, Math.PI * 1.0, Math.PI * 0.5);
+  const dangerZoneMat = new THREE.MeshBasicMaterial({color: 0xe74c3c, side: THREE.DoubleSide});
+  const dangerZone = new THREE.Mesh(dangerZoneGeom, dangerZoneMat);
+  dangerZone.rotation.x = Math.PI / 2;
+  dial.add(dangerZone);
+
+  // Needle
+  const needleGeom = new THREE.BoxGeometry(0.15, 0.15, 4);
+  const needleMat = new THREE.MeshPhongMaterial({color: 0xff4136});
+  const needle = new THREE.Mesh(needleGeom, needleMat);
+  needle.position.z = 2;
+  needle.position.y = 0.5;
+  dial.add(needle);
+
+  // Lights
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+  scene.add(ambientLight);
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+  dirLight.position.set(10,10,10);
+  scene.add(dirLight);
+
+  camera.position.set(0, 10, 15);
+  camera.lookAt(0, 0, 0);
+
+  // Animate needle to simulate RPM
+  let rpm = 0;
+  function animate(){
+    requestAnimationFrame(animate);
+
+    rpm += 25;
+    if(rpm > 7000) rpm = 0;
+
+    // Map RPM 0-7000 to angle from -135 deg to +135 deg (radians)
+    const minAngle = -Math.PI * 3/4;
+    const maxAngle = Math.PI * 3/4;
+    let angle = minAngle + (rpm / 7000) * (maxAngle - minAngle);
+    needle.rotation.z = angle;
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // Responsive canvas
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+</script>
+</body>
+</html>
