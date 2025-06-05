@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Driver Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .section { margin-bottom: 20px; }
+        button { padding: 10px 15px; cursor: pointer; }
+        #alerts { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Driver Skill & Alerts Dashboard</h1>
+
+    <div class="section">
+        <h2>Predict Driver Skill</h2>
+        <button onclick="getSkill()">Get Skill Level</button>
+        <p id="skillResult">Press the button to check skill level.</p>
+    </div>
+
+    <div class="section">
+        <h2>Real-time Driving Tips</h2>
+        <button onclick="getDrivingTips()">Get Tips</button>
+        <p id="tipsResult">Press the button to get driving tips.</p>
+        <p id="voiceCoach"></p>
+    </div>
+
+    <div class="section">
+        <h2>Speed & Gear Alert</h2>
+        Speed: <input type="number" id="speedInput" value="30" /> <br/>
+        Gear: <input type="number" id="gearInput" value="2" /> <br/>
+        <button onclick="getSpeedGearAlert()">Check Alert</button>
+        <p id="alerts"></p>
+    </div>
+
+    <script>
+        async function getSkill() {
+            const inputData = [0.2, 0.5, 0.7];  // example input, replace with real data
+            const response = await fetch('/predict_skill', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ input_data: inputData })
+            });
+            const data = await response.json();
+            document.getElementById('skillResult').innerText = "Skill Level: " + data.skill_level;
+        }
+
+        async function getDrivingTips() {
+            const response = await fetch('/driving_tips');
+            const data = await response.json();
+            document.getElementById('tipsResult').innerText = "Tips: " + data.tips;
+            document.getElementById('voiceCoach').innerText = "Voice Coach: " + data.voice_coach;
+        }
+
+        async function getSpeedGearAlert() {
+            const speed = parseInt(document.getElementById('speedInput').value);
+            const gear = parseInt(document.getElementById('gearInput').value);
+            const response = await fetch('/speed_gear_alert', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ speed, gear })
+            });
+            const data = await response.json();
+            document.getElementById('alerts').innerText = data.alert;
+        }
+    </script>
+</body>
+</html>
