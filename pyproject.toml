@@ -1,0 +1,26 @@
+[project]
+name = "visioner-control-sdla"
+version = "1.1.0"
+description = "AI Driving Coach + Smart Traffic Enforcement for Indian Roads"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = [
+    "flask>=3.0,<4",
+    "opencv-python-headless>=4.8,<5",
+    "numpy>=1.24,<2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4,<9",
+]
+ml = [
+    "tensorflow>=2.14",
+]
+hardware = [
+    "dlib",
+    "pyttsx3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

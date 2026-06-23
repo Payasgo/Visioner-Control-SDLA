@@ -1,0 +1,107 @@
+/* static/css/style.css */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background-color: #f0f2f5;
+    color: #1a1a2e;
+    padding: 2rem 1rem;
+    line-height: 1.6;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+header h1 {
+    color: #004d99;
+    font-size: 1.8rem;
+}
+
+.subtitle {
+    color: #666;
+    font-size: 0.95rem;
+    margin-top: 0.25rem;
+}
+
+#dashboard {
+    max-width: 720px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.card {
+    background: #fff;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.card h2 {
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
+    color: #333;
+}
+
+/* Skill badges */
+.badge {
+    display: inline-block;
+    padding: 0.35rem 1rem;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.badge--beginner { background: #fff3cd; color: #856404; }
+.badge--medium   { background: #cce5ff; color: #004085; }
+.badge--pro      { background: #d4edda; color: #155724; }
+
+/* Driving tip */
+.alert {
+    color: #d9534f;
+    font-weight: 600;
+}
+
+/* Progress table */
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+table td {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #eee;
+}
+
+table td:first-child {
+    width: 50%;
+}
+
+/* Status indicator */
+.poll-status {
+    text-align: center;
+    font-size: 0.75rem;
+    color: #999;
+    margin-top: 0.5rem;
+}
+
+@media (max-width: 480px) {
+    body {
+        padding: 1rem 0.5rem;
+    }
+
+    header h1 {
+        font-size: 1.4rem;
+    }
+}
