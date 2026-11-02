@@ -68,7 +68,8 @@ def test_lesson_tracker_records_mistake():
     tracker.update(data)
     summary = tracker.get_summary()
     assert summary["Mistakes"] == 1
-    assert summary["Duration (min)"] == 1
+    assert summary["Duration (min)"] == 0
+    assert summary["Samples"] == 1
 
 
 def test_lesson_tracker_no_mistakes():
@@ -85,9 +86,12 @@ def test_lesson_tracker_progress_in_progress():
     assert tracker.get_summary()["Progress"] == "In Progress"
 
 
-def test_lesson_tracker_progress_complete():
+def test_lesson_tracker_progress_complete(monkeypatch):
+    now = [100.0]
+    monkeypatch.setattr("app.behavior.lesson_tracker.monotonic", lambda: now[0])
     tracker = LessonTracker()
     for _ in range(10):
         tracker.update({"brake_events": 0, "lane_offset": 0.0})
+    now[0] += tracker.COMPLETION_DURATION_SECONDS
     summary = tracker.get_summary()
     assert summary["Progress"] == "Completed"

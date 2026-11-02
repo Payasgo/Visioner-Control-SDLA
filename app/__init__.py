@@ -1,29 +1,26 @@
-# app/__init__.py
+"""Flask application factory for Visioner-Control SDLA."""
 
-import os
+from pathlib import Path
+
 from flask import Flask
 
 
-def create_app(full_routes: bool = True) -> Flask:
-    """Application factory.
-
-    Parameters
-    ----------
-    full_routes:
-        True  -> use app.routes_full (full REST API + live dashboard).
-        False -> use app.routes      (original minimal routes).
-    """
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+def create_app(full_routes: bool = True, config: dict | None = None) -> Flask:
+    """Create an isolated Flask application with repository-relative assets."""
+    base_dir = Path(__file__).resolve().parent.parent
     app = Flask(
         __name__,
-        template_folder=os.path.join(base_dir, "static", "templates"),
-        static_folder=os.path.join(base_dir, "static"),
+        template_folder=str(base_dir / "static" / "templates"),
+        static_folder=str(base_dir / "static"),
     )
+    app.config.update(JSON_SORT_KEYS=False)
+    if config:
+        app.config.update(config)
 
     if full_routes:
         from app.routes_full import register_routes
     else:
-        from app.routes import register_routes  # type: ignore[assignment]
+        from app.routes import register_routes
 
     register_routes(app)
     return app
