@@ -1,30 +1,41 @@
 # app/behavior/lesson_tracker.py
 
+from __future__ import annotations
+
+from time import monotonic
+from typing import Any
+
 
 class LessonTracker:
-    """Accumulates per-loop driving metrics and produces a summary."""
+    """Track elapsed wall-clock time and driving mistakes for one lesson."""
 
-    MISTAKE_BRAKE_THRESHOLD: int = 2
-    MISTAKE_LANE_THRESHOLD: float = 0.5
-    COMPLETION_DURATION: int = 10  # minutes
+    MISTAKE_BRAKE_THRESHOLD = 2
+    MISTAKE_LANE_THRESHOLD = 0.5
+    COMPLETION_DURATION_SECONDS = 10 * 60
 
     def __init__(self) -> None:
-        self.duration: int = 0   # simulated minutes (one update == one minute)
-        self.mistakes: int = 0
+        self._started_at = monotonic()
+        self._mistakes = 0
+        self._samples = 0
 
-    def update(self, new_data: dict) -> None:
-        self.duration += 1
-        brakes: int = new_data.get("brake_events", 0)
-        offset: float = new_data.get("lane_offset", 0.0)
+    def update(self, new_data: dict[str, Any]) -> None:
+        """Record a telemetry sample without treating polls as elapsed minutes."""
+        self._samples += 1
+        brakes = int(new_data.get("brake_events", 0) or 0)
+        offset = float(new_data.get("lane_offset", 0.0) or 0.0)
         if brakes > self.MISTAKE_BRAKE_THRESHOLD or abs(offset) > self.MISTAKE_LANE_THRESHOLD:
-            self.mistakes += 1
+            self._mistakes += 1
 
-    def get_summary(self) -> dict:
-        progress = (
-            "Completed" if self.duration >= self.COMPLETION_DURATION else "In Progress"
-        )
+    def get_summary(self) -> dict[str, Any]:
+        elapsed_seconds = max(0, int(monotonic() - self._started_at))
         return {
-            "Duration (min)": self.duration,
-            "Mistakes": self.mistakes,
-            "Progress": progress,
+            "Duration (min)": elapsed_seconds // 60,
+            "Duration (seconds)": elapsed_seconds,
+            "Mistakes": self._mistakes,
+            "Samples": self._samples,
+            "Progress": (
+                "Completed"
+                if elapsed_seconds >= self.COMPLETION_DURATION_SECONDS
+                else "In Progress"
+            ),
         }
