@@ -1,320 +1,329 @@
 # Visioner-Control-SDLA
 
-**AI Driving Coach + Smart Traffic Enforcement | Built for Indian Roads**
+**AI Driving Coach & Smart Traffic-Law Assistance | Designed with Indian roads in mind**
 
-An ADAS-powered Self-Driving Lesson Assistant and Driver Behaviour System that provides real-time coaching, skill classification, lane correction, and safety alerts — all from a Raspberry Pi or any Linux machine with a webcam.
+Visioner-Control-SDLA is a Python-based driver-assistance and driving-lesson project. It combines a Flask dashboard, simulated or OBD-oriented vehicle telemetry, driver-skill feedback, safety coaching, and violation-recording APIs. The repository also contains optional computer-vision, camera, audio, and machine-learning components.
 
----
+> **Project status:** The web dashboard, simulator-oriented API, automated tests, and Docker image build are the currently testable baseline. Hardware-dependent features require compatible devices, optional dependencies, configuration, and real-world validation. This project is a prototype/driver-assistance aid—not an autonomous-driving system, certified enforcement device, or substitute for attentive driving.
 
-## Table of Contents
+## Contents
 
-- [Features](#features)
+- [Highlights](#highlights)
+- [Project status and limitations](#project-status-and-limitations)
 - [Architecture](#architecture)
-- [Quick Start](#quick-start)
+- [Requirements](#requirements)
+- [Quick start](#quick-start)
+- [Run with Docker](#run-with-docker)
 - [Configuration](#configuration)
-- [API Reference](#api-reference)
-- [Optional Dependencies](#optional-dependencies)
-- [Running Tests](#running-tests)
-- [Docker](#docker)
-- [Bug Fixes & Improvements (v1.1.0)](#bug-fixes--improvements-v110)
-- [Roadmap](#roadmap)
+- [HTTP API](#http-api)
+- [Optional hardware and ML features](#optional-hardware-and-ml-features)
+- [Tests and code quality](#tests-and-code-quality)
+- [Deployment](#deployment)
+- [Roadmap and future improvements](#roadmap-and-future-improvements)
 - [Contributing](#contributing)
 - [License](#license)
 
----
+## Highlights
 
-## Features
-
-| Module | What it does |
+| Component | Current purpose |
 |---|---|
-| **Driver Monitoring** | Eye-aspect-ratio drowsiness detection via webcam + dlib |
-| **OBD Telemetry** | Real-time speed, gear, and braking data; simulator fallback when no adapter is present |
-| **ADAS – Speed Control** | Per-skill-level speed limits with console and API warnings |
-| **ADAS – Gear Advisor** | Gear-shift suggestions based on current speed |
-| **ADAS – Auto Lane Correction** | Detects lane offset and computes a steering correction |
-| **Skill Classifier** | Rule-based Beginner / Medium / Pro classification (ML model optional) |
-| **Voice Coach** | Text-to-speech driving tips; graceful fallback to logging on headless systems |
-| **Lesson Tracker** | Per-session mistake counting and duration tracking |
-| **Web Dashboard** | Flask UI with live-polling telemetry, skill badge, tips, and progress table |
+| Web dashboard | Flask dashboard for driver skill, speed, lesson progress, coaching tips, and recent violations |
+| Telemetry simulator | Supplies sample vehicle data for development without a connected vehicle |
+| Driver-skill classifier | Rule-based Beginner / Medium / Pro classification |
+| Driving lesson tracker | Tracks elapsed lesson time, telemetry samples, and detected mistakes |
+| ADAS utilities | Speed-limit guidance, gear advice, and lane-deviation/correction logic |
+| Violation API | Validates and records violation events, with recent records and summary statistics |
+| Evidence utilities | Saves timestamped image evidence when called with a valid image frame |
+| Voice coaching | Provides driving tips, with optional text-to-speech support |
+| Optional computer vision | Camera and driver-monitoring scripts that require additional packages and model assets |
 
----
+## Project status and limitations
+
+The repository includes both runnable software and integrations that need external hardware or model files.
+
+- **Dashboard/API:** covered by the automated CI test and Docker build workflow.
+- **Container publishing:** the GitHub Actions workflow builds and pushes an image to GitHub Container Registry (GHCR).
+- **Server deployment:** requires valid SSH deployment secrets and a reachable server; a successful image push alone does not mean the application has been deployed.
+- **OBD-II:** use a compatible ELM327/OBD-II adapter and verify vehicle/protocol compatibility. Simulator data is not live vehicle data.
+- **Camera and drowsiness detection:** require a supported camera, optional vision dependencies, and the appropriate landmark/model assets.
+- **ML classification:** requires installing the ML extra and supplying a trained model. The rule-based classifier is the baseline.
+- **Lane correction and speed guidance:** are advisory software outputs. They are not connected to a certified steering/braking controller and must not be treated as control authority.
+
+Always test integrations in a safe, stationary, controlled environment before any vehicle use. Do not interact with the dashboard while driving.
 
 ## Architecture
 
-```
-run.py                        # Entry point: web or simulator mode
-│
+The main entry point is `run.py`.
+
+```text
+Visioner-Control-SDLA/
 ├── app/
-│   ├── __init__.py           # Flask application factory
-│   ├── routes.py             # Web routes + JSON API
-│   ├── main.py               # Simulator loop (CLI mode)
-│   ├── adas/
-│   │   ├── auto_correction.py  # Lane-deviation detection & correction
-│   │   ├── gear_alert.py       # Gear-shift advisor
-│   │   └── speed_control.py    # Speed-limit enforcer per skill level
-│   ├── behavior/
-│   │   ├── classifier.py       # Beginner / Medium / Pro rule classifier
-│   │   ├── lesson_tracker.py   # Session duration & mistake counter
-│   │   └── voice_coach.py      # Text coaching tips
-│   ├── telemetry/
-│   │   ├── obd_interface.py    # OBD-II serial adapter (mock-ready)
-│   │   └── simulator_interface.py  # Random telemetry for offline dev
-│   ├── hardware/
-│   │   ├── pi_camera.py        # OpenCV camera wrapper
-│   │   └── android_auto.py     # Android Auto stub
-│   └── utils/
-│       ├── config.py           # Centralised speed/gear thresholds
-│       └── logger.py           # Structured logging setup
-│
-├── modules/                  # Standalone reusable helpers
-│   ├── coaching.py           # TTS-backed voice coach
-│   ├── driver_skill.py       # TensorFlow ML classifier (optional)
-│   ├── progress_tracker.py   # JSON-file lesson persistence
-│   ├── safety_parking.py     # Steering correction + parking sensor logic
-│   └── speed_gear.py         # Speed-limit & gear-shift utilities
-│
-├── scripts/                  # Runnable entry points
-│   ├── main.py               # Full pipeline: camera → monitor → coach → score
-│   ├── driver_monitor.py     # dlib eye-tracking & drowsiness detection
-│   ├── coaching_engine.py    # TTS coaching rules
-│   ├── obd_simulator.py      # Fake OBD readings for development
-│   ├── skill_scorer.py       # Session score tracker (class-based)
-│   └── start_simulation.py   # Shortcut to simulator mode
-│
-├── model/
-│   └── train_model.py        # TensorFlow model trainer (outputs model/driver_skill_model.h5)
-│
-├── static/
-│   ├── templates/dashboard.html
-│   ├── css/style.css
-│   └── js/main.js            # Live-polling dashboard updater
-│
-└── tests/
-    ├── test_adas.py
-    └── test_behavior.py
+│   ├── __init__.py              # Flask application factory
+│   ├── routes_full.py           # Dashboard and JSON API routes
+│   ├── adas/                    # Speed, gear, and lane-assistance logic
+│   ├── behavior/                # Skill classification, lesson tracking, coaching
+│   ├── enforcement/             # Evidence capture and violation logging
+│   ├── hardware/                # Camera and hardware-facing helpers
+│   ├── telemetry/               # Simulator and OBD-oriented interfaces
+│   └── utils/                   # Application configuration and utilities
+├── modules/                     # Reusable project modules
+├── scripts/                     # Runnable pipeline and utility scripts
+├── model/                       # Model training utilities
+├── tests/                       # Automated tests
+├── requirements-ci.txt          # Lightweight CI/container dependencies
+├── requirements.txt             # Broader project dependency list
+├── pyproject.toml               # Package metadata and optional extras
+├── Dockerfile
+├── docker-compose.yml
+└── run.py                       # Application entry point
 ```
 
----
+## Requirements
 
-## Quick Start
+- Python 3.10 or newer (the Docker image uses Python 3.11).
+- pip.
+- Git.
+- Optional: Docker Engine and Docker Compose.
+- Optional hardware: supported camera, OBD-II adapter, microphone/speaker, and compatible Linux device.
 
-### 1. Clone and install
+## Quick start
+
+### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-org/Visioner-Control-SDLA.git
+git clone https://github.com/Payasgo/Visioner-Control-SDLA.git
 cd Visioner-Control-SDLA
-python -m pip install -r requirements.txt
 ```
 
-### 2. Run the web dashboard
+### 2. Create and activate a virtual environment
+
+Linux/macOS:
 
 ```bash
-python run.py
-# Open http://localhost:5000
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 
-Add `--debug` to enable Flask's reloader during development:
+Windows PowerShell:
+
+```powershell
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+### 3. Install the core application and development tools
+
+```bash
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+```
+
+This installs the dependencies declared in `pyproject.toml` plus pytest. The broader `requirements.txt` includes heavier integrations such as audio, OCR, and deep-learning packages; install those only when the corresponding feature is needed and your platform supports them.
+
+### 4. Start the dashboard
+
+```bash
+python run.py web
+```
+
+Open [http://localhost:5000](http://localhost:5000).
+
+For local development only, enable Flask's debug/reloader mode:
 
 ```bash
 python run.py web --debug
 ```
 
-### 3. Run in simulator mode (CLI, no browser)
+Do not enable debug mode on a public or production server.
+
+### 5. Run simulator mode
 
 ```bash
 python run.py simulator
 ```
 
-### 4. Run the full camera pipeline
+The simulator is intended for development and demonstration. It does not represent readings from a real vehicle.
 
-```bash
-# Install hardware deps first
-pip install ".[hardware]"
+## Run with Docker
 
-# Download the dlib landmark predictor
-wget http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2
-bunzip2 shape_predictor_68_face_landmarks.dat.bz2
-
-# Run (set env var if the .dat file is not in the project root)
-DLIB_PREDICTOR_PATH=/path/to/shape_predictor_68_face_landmarks.dat \
-  python -m scripts.main
-```
-
----
-
-## Configuration
-
-All tunable thresholds live in `app/utils/config.py`:
-
-```python
-CONFIG = {
-    "mode":                   "simulator",  # "simulator" | "obd"
-    "max_speed_beg":          40,           # km/h ceiling for Beginner
-    "max_speed_med":          60,           # km/h ceiling for Medium
-    "max_speed_pro":          80,           # km/h ceiling for Pro
-    "min_gear_change_speed":  20,           # km/h threshold for downshift warning
-}
-```
-
-Change any value here and all ADAS modules pick it up automatically — no other files need editing.
-
----
-
-## API Reference
-
-| Endpoint | Method | Response |
-|---|---|---|
-| `/` | GET | HTML dashboard (server-rendered) |
-| `/api/telemetry` | GET | `{ telemetry, skill, tip, progress }` |
-| `/api/health` | GET | `{ status: "ok" }` |
-
-### `/api/telemetry` example response
-
-```json
-{
-  "telemetry": {
-    "speed": 47.0,
-    "gear": 3,
-    "brake_events": 1,
-    "lane_offset": -0.12,
-    "steering_angle": 4.5
-  },
-  "skill": "Medium",
-  "tip": "Watch your mirrors and maintain a steady pace.",
-  "progress": {
-    "Duration (min)": 5,
-    "Mistakes": 2,
-    "Progress": "In Progress"
-  }
-}
-```
-
----
-
-## Optional Dependencies
-
-```bash
-# TensorFlow ML model (training + inference)
-pip install ".[ml]"
-
-# Hardware support (camera drowsiness detection + TTS voice coach)
-pip install ".[hardware]"
-
-# All optional extras
-pip install ".[ml,hardware]"
-```
-
----
-
-## Running Tests
-
-```bash
-pytest -v
-```
-
-All tests are self-contained and require only the base `requirements.txt` — no camera, TTS engine, or TensorFlow needed.
-
----
-
-## Docker
+Build and start the dashboard:
 
 ```bash
 docker compose up --build
-# Open http://localhost:5000
 ```
 
----
+Open [http://localhost:5000](http://localhost:5000). Stop the service with:
 
-## Bug Fixes & Improvements (v1.1.0)
+```bash
+docker compose down
+```
 
-The following issues were identified and resolved in this release.
+The default Compose configuration is development-oriented and bind-mounts the project directory. For production, use a reviewed deployment configuration with persistent data volumes, restricted network access, secrets management, and a production WSGI server.
 
-### Bug Fixes
+## Configuration
 
-**1. `scripts/main.py` — broken imports when run from project root**
-Bare `from driver_monitor import ...` only worked if the working directory was `scripts/`. Fixed by inserting the project root into `sys.path` at startup and switching to `from scripts.X import ...`, so the script runs correctly as `python -m scripts.main` from anywhere.
+The current driving thresholds are defined in `app/utils/config.py`:
 
-**2. `scripts/skill_scorer.py` — mutable global leaked state between sessions**
-`score = 100` at module level meant the score never reset across test runs or multiple sessions. Replaced with a `SkillScorer` class that stores state on the instance and exposes an explicit `reset()` method.
+```python
+CONFIG = {
+    "mode": "simulator",          # "simulator" or "obd"
+    "max_speed_beg": 40,          # km/h
+    "max_speed_med": 60,          # km/h
+    "max_speed_pro": 80,          # km/h
+    "min_gear_change_speed": 20,  # km/h
+}
+```
 
-**3. `scripts/driver_monitor.py` — module import crashed if `.dat` file was missing**
-`dlib.shape_predictor(path)` was called at the top level, so any `import driver_monitor` raised `FileNotFoundError` before any code ran. Moved to a lazy `_load_models()` helper, added a `DLIB_PREDICTOR_PATH` environment-variable override, and replaced the generic error with a descriptive message pointing to the download URL.
+These are project defaults, not legal speed limits. Actual road limits depend on location, vehicle class, signage, and applicable law. Do not use these values as a replacement for posted road signs or official regulations.
 
-**4. `app/behavior/classifier.py` — incorrect Pro/Medium boundary**
-A driver at 70 km/h with 5 harsh brake events was classified as "Pro" because the Pro check only tested speed. Fixed to also require `brake_events <= 1`, so aggressive brakers at speed are correctly kept at Medium.
+## HTTP API
 
-**5. `app/adas/auto_correction.py` — Left/Right labels were swapped**
-A positive `lane_offset` (drifting right) printed "Left deviation", and vice-versa. Corrected the direction mapping: `lane_offset > 0` → "Right deviation", `lane_offset < 0` → "Left deviation".
+The Flask application exposes the following endpoints:
 
-**6. `app/__init__.py` — fragile relative `template_folder` path**
-`template_folder="../static/templates"` resolved correctly only when the process was started from the project root. Replaced with an `os.path.abspath`-based path so the app works regardless of current working directory.
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/` | GET | Dashboard HTML |
+| `/api/health` | GET | Basic application health response |
+| `/api/telemetry` | GET | Current simulator telemetry, skill, coaching tip, and lesson progress |
+| `/api/session` | GET | Skill, lesson progress, and coaching tip |
+| `/api/violations?n=20` | GET | Recent violation records; `n` must be between 1 and 200 |
+| `/api/violations` | POST | Validate and record a violation |
+| `/api/violations/stats` | GET | Total violations, counts by type, and recent records |
 
-**7. `app/routes.py` — module-level singletons caused double-counting and test pollution**
-`TelemetrySimulator`, `DriverClassifier`, `LessonTracker`, and `VoiceCoach` were instantiated at import time, meaning their state (especially `LessonTracker`) accumulated across every request and persisted between test cases. Moved inside `register_routes()` so they are scoped to the application instance. The `/api/telemetry` endpoint no longer calls `tracker.update()` to avoid counting the same loop twice when the JS dashboard polls alongside normal page loads.
+### Health check
 
-**8. `modules/progress_tracker.py` — `os.makedirs` crashed on a plain filename**
-When `filepath="progress.json"` (no directory component), `os.path.dirname` returns `""` and `os.makedirs("")` raises `FileNotFoundError`. Added a guard: `if dir_name: os.makedirs(dir_name, exist_ok=True)`.
+```bash
+curl http://localhost:5000/api/health
+```
 
-**9. `app/hardware/pi_camera.py` — camera open failure was silently ignored**
-`cv2.VideoCapture(index)` never raises an exception; you must call `.isOpened()` to detect failure. Added the check in `__init__` with a descriptive `CameraError`. Also added context-manager (`__enter__`/`__exit__`) support for safe resource cleanup.
+Returns a JSON object containing a status and UTC timestamp.
 
-**10. `app/telemetry/obd_interface.py` — bare `Exception` on connection error**
-A bare `raise Exception("OBD not connected.")` is uncatchable by type. Replaced with a typed `OBDConnectionError(RuntimeError)` so callers can catch it specifically without swallowing other errors.
+### Telemetry
 
-**11. `modules/coaching.py` — `pyttsx3.init()` in `__init__` crashed headless servers**
-Constructing the TTS engine eagerly in `__init__` meant instantiating `VoiceCoach` on any machine without audio hardware (CI, Docker, Raspberry Pi Lite) raised an exception. TTS initialisation is now lazy and wrapped in `try/except`, falling back to `logging.info` when unavailable.
+```bash
+curl http://localhost:5000/api/telemetry
+```
 
-**12. `model/train_model.py` vs `modules/driver_skill.py` — model path mismatch**
-The trainer saved to `model/driver_skill_model.h5` but the classifier tried to load from `models/skill_classifier.h5` (different directory name, different filename). Unified to `model/driver_skill_model.h5` and added a `DEFAULT_MODEL_PATH` constant shared between both files.
+The response includes `telemetry`, `skill`, `tip`, and `progress`. Telemetry fields are supplied by the configured telemetry source; in the default development setup this is simulated data.
 
-**13. `run.py` — `debug=True` hardcoded in the production entrypoint**
-Flask's debug mode enables the interactive debugger and auto-reloader, both of which are security risks in production. Moved to an explicit `--debug` flag: `python run.py web --debug`.
+### Record a violation
 
-**14. `static/js/main.js` — live polling only updated the skill badge**
-The `fetch("/api/telemetry")` loop refreshed the skill badge but never updated the driving tip or the progress table, leaving them stale after the initial page load. Fixed to update all three sections. Added minimal HTML escaping on server-returned strings to prevent XSS.
+```bash
+curl -X POST http://localhost:5000/api/violations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "violation_type": "SPEEDING",
+    "license_plate": "TEST-123",
+    "speed_kmh": 75,
+    "confidence": 0.95,
+    "location": "Test location"
+  }'
+```
 
-**15. `app/utils/config.py` — missing `max_speed_med` key**
-`SpeedController` had a magic hardcoded `60` for the Medium skill ceiling. Extracted to `CONFIG["max_speed_med"]` for consistency with the other thresholds.
+The API validates the JSON object and numeric ranges before recording the event. A successful creation returns HTTP `201`; invalid input returns HTTP `400`. Do not submit real personal or vehicle-identifying data to an unauthenticated/public instance.
 
-**16. `scripts/main.py` — no camera cleanup on error**
-`cap.release()` and `cv2.destroyAllWindows()` were only called on clean exit. A crash mid-loop left the camera handle open. Wrapped the main loop in `try/finally` to guarantee cleanup.
+## Optional hardware and ML features
 
-### General Improvements
+The project declares optional extras in `pyproject.toml`:
 
-- **Type annotations** added throughout (`-> str | None`, `-> dict`, etc.) for IDE support and early error detection.
-- **Docstrings** added or expanded on every public class and method.
-- **Named constants** (`DEVIATION_THRESHOLD`, `CORRECTION_GAIN`, `EAR_THRESHOLD`, etc.) replace magic numbers.
-- **`app/utils/logger.py`** format string updated to include the logger name, making multi-module log output easier to trace.
-- **`modules/driver_skill.py`** model loading is now lazy (deferred to first `predict_skill()` call) so the rest of the app starts even when TensorFlow is not installed.
-- **`modules/safety_parking.py`** `parking_logic` now handles a missing `distance` key gracefully instead of returning a misleading "Parking clear" message.
-- **`modules/speed_gear.py`** `check_speed_limit` warning message now includes the current speed alongside the limit for clearer feedback.
-- **`scripts/start_simulation.py`** emoji removed from `print()` to avoid encoding errors on Windows terminals and some SSH sessions.
-- **Tests expanded** — added cases for unknown skill level in `SpeedController`, Medium classification with high brake events, missing telemetry keys in `DriverClassifier`, and "In Progress" vs "Completed" progress states.
+```bash
+# ML model support
+python -m pip install -e ".[ml]"
 
----
+# Camera/voice-related hardware support
+python -m pip install -e ".[hardware]"
 
-## Roadmap
+# Development and all optional extras
+python -m pip install -e ".[dev,ml,hardware]"
+```
 
-- [ ] Real OBD-II integration via `pyOBD` / ELM327 adapter
-- [ ] GPS-based speed-limit lookup for Indian road zones
-- [ ] Persistent session history with SQLite
-- [ ] Mobile-responsive dashboard with Chart.js telemetry graphs
-- [ ] Multi-driver profile support
-- [ ] WebSocket push (replace polling with `flask-socketio`)
+Some scripts may need additional system packages or assets not installed by these extras. For example, dlib-based facial landmark detection requires a compatible landmark predictor file. Follow the relevant script's instructions and configure its model path (for example, with `DLIB_PREDICTOR_PATH`) before running it.
 
----
+The full `requirements.txt` includes additional packages for OCR, object detection, audio input, and TensorFlow. These can be difficult to install on some operating systems and single-board computers; install only what you need, and check each dependency's platform support.
+
+## Tests and code quality
+
+Install the development extra and run:
+
+```bash
+python -m pytest -v
+```
+
+The GitHub Actions CI workflow also compiles Python modules, runs the test suite, and builds the Docker image. The CI dependency set is intentionally lightweight and does not validate physical camera, audio, OBD-II, or vehicle-control hardware.
+
+Before opening a pull request, please run the tests locally and include tests for new behavior.
+
+## Deployment
+
+The CD workflow publishes the container image to:
+
+```text
+ghcr.io/payasgo/visioner-control:latest
+```
+
+The optional SSH deployment step expects these GitHub Actions repository secrets:
+
+- `SERVER_IP` — hostname or IP address of the deployment server.
+- `SERVER_USER` — SSH login username.
+- `SERVER_SSH_KEY` — private SSH key authorized on that server.
+
+The server must have Docker installed and network access to GHCR. If the GHCR package is private, configure a suitable server-side package-read credential (with least-privilege `read:packages`) or make the package public; do not rely on a short-lived workflow token for persistent server access. Never commit credentials, private keys, or tokens to the repository.
+
+The current deployment workflow should be considered configured only after the SSH step completes successfully and the deployed service passes a health check.
+
+## Roadmap and future improvements
+
+The following are planned improvements, not claims that these capabilities are already complete.
+
+### Reliability and security
+- [ ] Add authentication and role-based authorization to dashboard and violation-management APIs.
+- [ ] Add API rate limiting, request-size limits, security headers, and production CORS policy.
+- [ ] Move violation and lesson records from CSV/JSONL to SQLite initially, with a migration path to PostgreSQL.
+- [ ] Add structured, rotating logs and robust handling of concurrent writes.
+- [ ] Add persistent Docker volumes, backup/restore procedures, and deployment health checks.
+- [ ] Add deployment rollback and immutable image tags tied to Git commit SHAs.
+
+### Driving lessons and telemetry
+- [ ] Separate telemetry ingestion from dashboard polling so repeated HTTP requests cannot create duplicate samples or inflate mistake counts.
+- [ ] Add timestamped telemetry storage, session identifiers, and accurate per-session summaries.
+- [ ] Implement and validate live OBD-II/ELM327 readings, connection recovery, and supported PID discovery.
+- [ ] Add GPS integration and a verified source for location-aware road speed limits.
+- [ ] Support multiple driver profiles and configurable lesson plans.
+
+### Computer vision and safety
+- [ ] Add camera reconnect handling, frame validation, and configurable camera selection.
+- [ ] Evaluate drowsiness detection across lighting conditions, camera positions, and diverse users.
+- [ ] Add model versioning, confidence thresholds, and documented validation datasets for ML features.
+- [ ] Measure lane-detection accuracy and clearly separate advisory steering suggestions from actual vehicle control.
+- [ ] Add a privacy-conscious evidence retention policy, access controls, and configurable deletion.
+
+### Dashboard and developer experience
+- [ ] Add live charts, historical trends, and downloadable session reports.
+- [ ] Replace periodic polling with WebSockets or Server-Sent Events where appropriate.
+- [ ] Improve mobile accessibility and dashboard responsiveness.
+- [ ] Add API schema documentation (OpenAPI), integration tests, and test coverage reporting.
+- [ ] Add dependency vulnerability scanning, formatting, linting, and type checking to CI.
+
+### Validation and release readiness
+- [ ] Add hardware-in-the-loop tests for camera, audio, and OBD-II integrations.
+- [ ] Add safe simulator scenarios for sensor failures, stale telemetry, and disconnected devices.
+- [ ] Document supported Raspberry Pi/Linux versions and tested hardware combinations.
+- [ ] Establish measurable acceptance criteria before describing any feature as production-ready.
 
 ## Contributing
 
-1. Fork this repository
-2. Create a feature branch: `git checkout -b feature/my-improvement`
-3. Make your changes with tests: `pytest -v`
-4. Open a Pull Request with a clear description
+Contributions, bug reports, and improvement suggestions are welcome.
 
-Please keep PRs focused — one fix or feature per PR.
+1. Fork the repository.
+2. Create a focused branch: `git checkout -b feature/your-improvement`.
+3. Make the change and add or update tests.
+4. Run `python -m pytest -v`.
+5. Open a pull request describing the problem, solution, tests, and any hardware required.
 
----
+Please avoid committing generated evidence, personal data, model weights, credentials, or large temporary files.
 
 ## License
 
-MIT — see [LICENSE](LICENSE) for full terms.
+This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for the full license text.
+
+Copyright (c) 2026 **Kranthi kumar yaralagadda**.
