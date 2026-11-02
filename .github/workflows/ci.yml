@@ -1,8 +1,14 @@
 name: CI
+
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, "improve/**"]
   pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -10,10 +16,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
           cache: pip
-      - run: |
+      - name: Install CI dependencies
+        run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-ci.txt
-      - run: pytest
-      - run: docker build -t visioner-control .
+          python -m pip install -r requirements-ci.txt
+      - name: Compile Python modules
+        run: python -m compileall -q app modules scripts run.py
+      - name: Run tests
+        run: python -m pytest -q
+      - name: Build web image
+        run: docker build -t visioner-control-sdla .
