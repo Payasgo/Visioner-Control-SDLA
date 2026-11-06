@@ -69,6 +69,8 @@ def test_session_lifecycle_endpoints(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     client = create_app().test_client()
     assert client.post("/api/session", json={"action": "pause"}).status_code == 200
+    blocked = client.post("/api/telemetry", json={"event_id": "paused", "speed": 30})
+    assert blocked.status_code == 409
     assert client.post("/api/session", json={"action": "resume"}).status_code == 200
     assert client.post("/api/session", json={"action": "end"}).status_code == 200
     assert client.post("/api/session", json={"action": "start"}).get_json()["progress"]["Samples"] == 0
