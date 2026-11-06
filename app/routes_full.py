@@ -128,12 +128,17 @@ def register_routes(app: Flask) -> None:
             return jsonify(error="At least one supported telemetry field is required"), 400
 
         event_id = event_id.strip()
+        if not tracker.is_active:
+            return jsonify(error="lesson session is not active", progress=tracker.get_summary()), 409
+        if tracker.has_event(event_id):
+            return jsonify(accepted=False, duplicate=True, event_id=event_id,
+                           progress=tracker.get_summary()), 200
         accepted = tracker.update(telemetry, event_id=event_id)
         if accepted:
             latest_telemetry = telemetry
             latest_event_id = event_id
         return jsonify(accepted=accepted, duplicate=not accepted, event_id=event_id,
-                       progress=tracker.get_summary()), (202 if accepted else 200)
+                       progress=tracker.get_summary()), (202 if accepted else 409)
 
     @app.get("/api/violations")
     def api_violations_get():
