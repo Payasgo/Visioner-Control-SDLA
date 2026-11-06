@@ -41,6 +41,6 @@ class DriverClassifier:
 
         if score < 60:
             return "Beginner"
-        if score < 80:
+        if score < 85:
             return "Medium"
         return "Pro"
