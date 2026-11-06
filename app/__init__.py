@@ -13,7 +13,7 @@ def create_app(full_routes: bool = True, config: dict | None = None) -> Flask:
         template_folder=str(base_dir / "static" / "templates"),
         static_folder=str(base_dir / "static"),
     )
-    app.config.update(JSON_SORT_KEYS=False)
+    app.config.update(JSON_SORT_KEYS=False, MAX_CONTENT_LENGTH=1 * 1024 * 1024)
     if config:
         app.config.update(config)
 

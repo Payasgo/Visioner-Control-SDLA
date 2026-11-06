@@ -32,7 +32,8 @@ Visioner-Control-SDLA is a Python-based driver-assistance and driving-lesson pro
 | Driver-skill classifier | Rule-based Beginner / Medium / Pro classification |
 | Driving lesson tracker | Tracks elapsed lesson time, telemetry samples, and detected mistakes |
 | ADAS utilities | Speed-limit guidance, gear advice, and lane-deviation/correction logic |
-| Violation API | Validates and records violation events, with recent records and summary statistics |
+| Violation API | Validates and records violation events in SQLite, with indexed history and summary statistics |
+| Session lifecycle | Explicit start, pause, resume, and end actions; only ingested telemetry counts as a sample |
 | Evidence utilities | Saves timestamped image evidence when called with a valid image frame |
 | Voice coaching | Provides driving tips, with optional text-to-speech support |
 | Optional computer vision | Camera and driver-monitoring scripts that require additional packages and model assets |
@@ -158,7 +159,7 @@ Open [http://localhost:5000](http://localhost:5000). Stop the service with:
 docker compose down
 ```
 
-The default Compose configuration is development-oriented and bind-mounts the project directory. For production, use a reviewed deployment configuration with persistent data volumes, restricted network access, secrets management, and a production WSGI server.
+The container uses Gunicorn behind the WSGI entry point and runs as a non-root user. Docker Compose persists SQLite data in the `visioner-data` named volume and includes an HTTP health check. Keep the service behind a trusted reverse proxy and add authentication/authorization before exposing it publicly.
 
 ## Configuration
 
@@ -184,8 +185,10 @@ The Flask application exposes the following endpoints:
 |---|---|---|
 | `/` | GET | Dashboard HTML |
 | `/api/health` | GET | Basic application health response |
-| `/api/telemetry` | GET | Current simulator telemetry, skill, coaching tip, and lesson progress |
-| `/api/session` | GET | Skill, lesson progress, and coaching tip |
+| `/api/telemetry` | GET | Read the latest telemetry snapshot without changing lesson counters |
+| `/api/telemetry` | POST | Ingest one validated telemetry event; requires a unique `event_id` |
+| `/api/session` | GET | Current skill band, lesson progress, and coaching tip |
+| `/api/session` | POST | Start, pause, resume, or end a lesson session |
 | `/api/violations?n=20` | GET | Recent violation records; `n` must be between 1 and 200 |
 | `/api/violations` | POST | Validate and record a violation |
 | `/api/violations/stats` | GET | Total violations, counts by type, and recent records |
@@ -220,7 +223,28 @@ curl -X POST http://localhost:5000/api/violations \
   }'
 ```
 
-The API validates the JSON object and numeric ranges before recording the event. A successful creation returns HTTP `201`; invalid input returns HTTP `400`. Do not submit real personal or vehicle-identifying data to an unauthenticated/public instance.
+The API validates the JSON object and numeric ranges before recording the event. A successful creation returns HTTP `201`; a retry using the same `event_id` returns the existing record; invalid input returns HTTP `400`. Records are stored in `data/logs/violations.sqlite3`. Existing `violations.csv` records are imported once when the SQLite database is first initialized. Do not submit real personal or vehicle-identifying data to an unauthenticated/public instance.
+
+### Ingest telemetry
+
+Dashboard reads do not create samples. A simulator or sensor integration must explicitly submit each new event with a stable event ID:
+
+```bash
+curl -X POST http://localhost:5000/api/telemetry \\
+  -H 'Content-Type: application/json' \\
+  -d '{"event_id":"demo-0001","speed":42,"brake_events":0,"lane_offset":0.1}'
+```
+
+Supported fields include `speed` (0–300 km/h), `brake_events` (integer 0–100), `lane_offset` (-10–10), `steering_angle` (-720–720), `harsh_acceleration` (0–100), and `speed_limit` (0–300). The same event ID is accepted only once per active lesson. A new session clears its event history and counters.
+
+### Session controls
+
+```bash
+curl -X POST http://localhost:5000/api/session -H 'Content-Type: application/json' -d '{"action":"start"}'
+# Supported actions: start, pause, resume, end
+```
+
+The driver-coaching band is a conservative rule-based heuristic using behaviour signals; it is not a validated assessment of driving skill. Speed alone never grants a higher band.
 
 ## Optional hardware and ML features
 
@@ -276,15 +300,18 @@ The current deployment workflow should be considered configured only after the S
 The following are planned improvements, not claims that these capabilities are already complete.
 
 ### Reliability and security
-- [ ] Add authentication and role-based authorization to dashboard and violation-management APIs.
+- [ ] Add authentication and role-based authorization to dashboard and violation-management APIs (required before public deployment).
 - [ ] Add API rate limiting, request-size limits, security headers, and production CORS policy.
-- [ ] Move violation and lesson records from CSV/JSONL to SQLite initially, with a migration path to PostgreSQL.
+- [x] Move violation records to SQLite with indexes and one-time import of existing CSV history.
+- [ ] Persist lesson/session history in SQLite; the current lesson tracker is process-local.
 - [ ] Add structured, rotating logs and robust handling of concurrent writes.
 - [ ] Add persistent Docker volumes, backup/restore procedures, and deployment health checks.
 - [ ] Add deployment rollback and immutable image tags tied to Git commit SHAs.
 
 ### Driving lessons and telemetry
-- [ ] Separate telemetry ingestion from dashboard polling so repeated HTTP requests cannot create duplicate samples or inflate mistake counts.
+- [x] Separate telemetry ingestion from dashboard reads; ingestion requires an event ID and duplicate IDs are ignored.
+- [x] Add session start, pause, resume, and end controls.
+- [ ] Run a dedicated simulator/sensor ingestion loop so the dashboard receives continuously refreshed telemetry without generating events from page reads.
 - [ ] Add timestamped telemetry storage, session identifiers, and accurate per-session summaries.
 - [ ] Implement and validate live OBD-II/ELM327 readings, connection recovery, and supported PID discovery.
 - [ ] Add GPS integration and a verified source for location-aware road speed limits.
@@ -300,6 +327,7 @@ The following are planned improvements, not claims that these capabilities are a
 ### Dashboard and developer experience
 - [ ] Add live charts, historical trends, and downloadable session reports.
 - [ ] Replace periodic polling with WebSockets or Server-Sent Events where appropriate.
+- [x] Run the web container with Gunicorn, a non-root user, persistent data volume, and health check.
 - [ ] Improve mobile accessibility and dashboard responsiveness.
 - [ ] Add API schema documentation (OpenAPI), integration tests, and test coverage reporting.
 - [ ] Add dependency vulnerability scanning, formatting, linting, and type checking to CI.
