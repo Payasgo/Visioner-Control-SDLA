@@ -104,3 +104,19 @@ def test_violation_storage_persists_and_deduplicates(monkeypatch, tmp_path):
     stats = second_client.get("/api/violations/stats").get_json()
     assert stats["total"] == 1
     assert stats["by_type"]["SPEEDING"] == 1
+
+
+def test_legacy_csv_history_is_migrated_to_sqlite(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    log_dir = tmp_path / "data" / "logs"
+    log_dir.mkdir(parents=True)
+    (log_dir / "violations.csv").write_text(
+        "timestamp,violation_type,license_plate,speed_kmh,confidence,evidence_image,location\n"
+        "2026-01-01 10:00:00,SPEEDING,TEST-1,72.0,0.9,,Hyderabad\n",
+        encoding="utf-8",
+    )
+    client = create_app().test_client()
+    rows = client.get("/api/violations").get_json()
+    assert len(rows) == 1
+    assert rows[0]["violation_type"] == "SPEEDING"
+    assert rows[0]["license_plate"] == "TEST-1"
