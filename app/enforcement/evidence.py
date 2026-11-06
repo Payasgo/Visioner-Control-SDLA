@@ -151,6 +151,11 @@ class ViolationLogger:
             ).fetchall()
         return {"total": total, "by_type": {row["violation_type"]: row["count"] for row in counts}}
 
+    def get_by_id(self, event_id: str) -> dict | None:
+        with self._connect() as db:
+            row = db.execute("SELECT * FROM violations WHERE id = ?", (event_id,)).fetchone()
+        return dict(row) if row else None
+
     @property
     def database_path(self) -> Path:
         return self._database_path
