@@ -20,4 +20,4 @@ RUN mkdir -p /app/data/logs /app/data/evidence && \
 USER appuser
 
 EXPOSE 5000
-CMD ["gunicorn", "--workers", "2", "--threads", "4", "--timeout", "30", "--bind", "0.0.0.0:5000", "run:create_app()"]
+CMD ["gunicorn", "--workers", "2", "--threads", "4", "--timeout", "30", "--bind", "0.0.0.0:5000", "wsgi:app"]
