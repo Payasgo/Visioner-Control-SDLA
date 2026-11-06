@@ -183,9 +183,9 @@ def register_routes(app: Flask) -> None:
         except Exception as exc:
             # SQLite uniqueness violations are treated as idempotent client retries.
             if event_id:
-                existing = next((row for row in vlogger.get_recent(1000) if row["id"] == event_id), None)
+                existing = vlogger.get_by_id(event_id.strip())
                 if existing:
-                    return jsonify(existing, duplicate=True), 200
+                    return jsonify({**existing, "duplicate": True}), 200
             app.logger.exception("Could not persist violation")
             return jsonify(error="Could not persist violation"), 500
         return jsonify(record), 201
