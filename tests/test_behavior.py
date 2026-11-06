@@ -1,71 +1,47 @@
-# tests/test_behavior.py
-
 from app.behavior.classifier import DriverClassifier
 from app.behavior.lesson_tracker import LessonTracker
 from app.behavior.voice_coach import VoiceCoach
 
 
-# ── DriverClassifier ──────────────────────────────────────────────────────────
-
-def test_driver_classifier_beginner():
+def test_classifier_does_not_reward_high_speed():
     classifier = DriverClassifier()
-    result = classifier.classify({"speed": 25, "brake_events": 3})
-    assert result == "Beginner"
+    assert classifier.classify({"speed": 95}) == "Unknown"
 
 
-def test_driver_classifier_medium_low_speed():
+def test_classifier_uses_behaviour_signals():
     classifier = DriverClassifier()
-    result = classifier.classify({"speed": 45, "brake_events": 1})
-    assert result == "Medium"
+    assert classifier.classify({"brake_events": 0, "lane_offset": 0.1}) == "Pro"
+    assert classifier.classify({"brake_events": 2, "lane_offset": 0.1}) == "Medium"
+    assert classifier.classify({"brake_events": 4, "lane_offset": 0.8}) == "Beginner"
 
 
-def test_driver_classifier_medium_high_brakes():
-    """High speed but many brakes → still Medium (not Pro)."""
+def test_classifier_penalizes_speed_only_when_limit_is_known():
     classifier = DriverClassifier()
-    result = classifier.classify({"speed": 70, "brake_events": 3})
-    assert result == "Medium"
+    safe = classifier.classify({"brake_events": 0, "lane_offset": 0.1, "speed": 90})
+    over_limit = classifier.classify({
+        "brake_events": 0, "lane_offset": 0.1, "speed": 90, "speed_limit": 50,
+    })
+    assert safe == "Pro"
+    assert over_limit == "Medium"
 
-
-def test_driver_classifier_pro():
-    classifier = DriverClassifier()
-    result = classifier.classify({"speed": 80, "brake_events": 0})
-    assert result == "Pro"
-
-
-def test_driver_classifier_defaults():
-    """Missing keys should not raise."""
-    classifier = DriverClassifier()
-    result = classifier.classify({})
-    assert result in {"Beginner", "Medium", "Pro"}
-
-
-# ── VoiceCoach ────────────────────────────────────────────────────────────────
 
 def test_voice_coach_tip(capsys):
     coach = VoiceCoach()
     coach.give_tip("Beginner")
-    captured = capsys.readouterr()
-    assert "Keep your hands on the wheel" in captured.out
+    assert "Keep your hands on the wheel" in capsys.readouterr().out
 
 
 def test_voice_coach_get_tip():
-    coach = VoiceCoach()
-    tip = coach.get_tip("Pro")
-    assert "overtaking" in tip.lower()
+    assert "overtaking" in VoiceCoach().get_tip("Pro").lower()
 
 
 def test_voice_coach_unknown_level():
-    coach = VoiceCoach()
-    tip = coach.get_tip("Unknown")
-    assert tip == "Drive safely!"
+    assert VoiceCoach().get_tip("Unknown") == "Drive safely!"
 
 
-# ── LessonTracker ─────────────────────────────────────────────────────────────
-
-def test_lesson_tracker_records_mistake():
+def test_lesson_tracker_records_one_mistake_per_sample():
     tracker = LessonTracker()
-    data = {"brake_events": 3, "lane_offset": 0.6}
-    tracker.update(data)
+    tracker.update({"brake_events": 3, "lane_offset": 0.6})
     summary = tracker.get_summary()
     assert summary["Mistakes"] == 1
     assert summary["Duration (min)"] == 0
@@ -74,15 +50,12 @@ def test_lesson_tracker_records_mistake():
 
 def test_lesson_tracker_no_mistakes():
     tracker = LessonTracker()
-    data = {"brake_events": 1, "lane_offset": 0.2}
-    tracker.update(data)
-    summary = tracker.get_summary()
-    assert summary["Mistakes"] == 0
+    tracker.update({"brake_events": 1, "lane_offset": 0.2})
+    assert tracker.get_summary()["Mistakes"] == 0
 
 
 def test_lesson_tracker_progress_in_progress():
     tracker = LessonTracker()
-    tracker.update({"brake_events": 0, "lane_offset": 0.0})
     assert tracker.get_summary()["Progress"] == "In Progress"
 
 
@@ -90,8 +63,7 @@ def test_lesson_tracker_progress_complete(monkeypatch):
     now = [100.0]
     monkeypatch.setattr("app.behavior.lesson_tracker.monotonic", lambda: now[0])
     tracker = LessonTracker()
-    for _ in range(10):
-        tracker.update({"brake_events": 0, "lane_offset": 0.0})
+    for index in range(10):
+        tracker.update({"brake_events": 0, "lane_offset": 0.0}, event_id=str(index))
     now[0] += tracker.COMPLETION_DURATION_SECONDS
-    summary = tracker.get_summary()
-    assert summary["Progress"] == "Completed"
+    assert tracker.get_summary()["Progress"] == "Completed"
