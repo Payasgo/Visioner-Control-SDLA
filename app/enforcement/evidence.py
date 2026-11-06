@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import logging
 import sqlite3
 import uuid
@@ -99,6 +100,43 @@ class ViolationLogger:
             """)
             db.execute("CREATE INDEX IF NOT EXISTS idx_violations_timestamp ON violations(timestamp)")
             db.execute("CREATE INDEX IF NOT EXISTS idx_violations_type ON violations(violation_type)")
+        self._migrate_legacy_csv()
+
+    def _migrate_legacy_csv(self) -> None:
+        """Import existing CSV records once so the storage upgrade preserves history."""
+        legacy_path = self._dir / "violations.csv"
+        if not legacy_path.exists():
+            return
+        with self._connect() as db:
+            if db.execute("SELECT COUNT(*) FROM violations").fetchone()[0]:
+                return
+            with legacy_path.open(newline="", encoding="utf-8") as source:
+                for old in csv.DictReader(source):
+                    raw_timestamp = old.get("timestamp") or datetime.now(timezone.utc).isoformat()
+                    try:
+                        parsed = datetime.fromisoformat(raw_timestamp)
+                    except ValueError:
+                        parsed = datetime.now(timezone.utc)
+                    if parsed.tzinfo is None:
+                        parsed = parsed.replace(tzinfo=timezone.utc)
+                    raw_speed = old.get("speed_kmh")
+                    try:
+                        speed = float(raw_speed) if raw_speed not in (None, "") else None
+                    except (TypeError, ValueError):
+                        speed = None
+                    try:
+                        confidence = float(old.get("confidence") or 1.0)
+                    except (TypeError, ValueError):
+                        confidence = 1.0
+                    db.execute(
+                        """INSERT OR IGNORE INTO violations
+                        (id, timestamp, violation_type, license_plate, speed_kmh, confidence, evidence_image, location)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (str(uuid.uuid4()), parsed.astimezone(timezone.utc).isoformat(),
+                         old.get("violation_type") or "UNKNOWN", old.get("license_plate") or "UNKNOWN",
+                         speed, min(max(confidence, 0.0), 1.0), old.get("evidence_image") or "",
+                         old.get("location") or "N/A"),
+                    )
 
     def log(
         self, violation_type: str, license_plate: str = "UNKNOWN",
