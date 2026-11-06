@@ -61,6 +61,15 @@ class LessonTracker:
             self._ended_at = now
             return True
 
+    @property
+    def is_active(self) -> bool:
+        with self._lock:
+            return self._started_at is not None and self._ended_at is None and self._paused_at is None
+
+    def has_event(self, event_id: str) -> bool:
+        with self._lock:
+            return event_id in self._event_ids
+
     def update(self, new_data: dict[str, Any], event_id: str | None = None) -> bool:
         """Ingest one sample. Duplicate event IDs and inactive sessions are ignored."""
         if not isinstance(new_data, dict):
