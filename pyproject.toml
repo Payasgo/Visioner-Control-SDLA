@@ -1,13 +1,14 @@
 [project]
 name = "visioner-control-sdla"
-version = "1.1.0"
-description = "AI Driving Coach + Smart Traffic Enforcement for Indian Roads"
+version = "1.2.0"
+description = "AI Driving Coach + Smart Traffic Safety Monitoring"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 dependencies = [
     "flask>=3.0,<4",
     "opencv-python-headless>=4.8,<5",
     "numpy>=1.24,<2",
+    "gunicorn>=22,<24",
 ]
 
 [project.optional-dependencies]
